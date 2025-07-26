@@ -1,0 +1,43 @@
+version: '3.8'
+
+services:
+  # Serviço MinIO
+  minio:
+    image: minio/minio:latest # Usa a imagem oficial mais recente do MinIO
+    ports:
+      - "9000:9000" # Porta da API MinIO
+      - "9001:9001" # Porta do Console MinIO
+    environment:
+      # Credenciais de acesso para o MinIO
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin
+      # Comando para iniciar o MinIO
+    command: server /data --console-address ":9001"
+    volumes:
+      # Monta um "volume" para persistir os dados do MinIO
+      - ./minio_data:/data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 30s
+      timeout: 20s
+      retries: 3
+
+  # Serviço da Aplicação FastAPI
+  api:
+    build: ./api # Constrói a imagem a partir do Dockerfile 
+    ports:
+      - "8000:8000" # Mapeia a porta 8000 do contêiner para a porta 8000 do host
+    environment:
+      # Variáveis de ambiente para a API FastAPI se conectar ao MinIO
+      
+      MINIO_ENDPOINT: minio:9000
+      MINIO_ACCESS_KEY: minioadmin
+      MINIO_SECRET_KEY: minioadmin
+      MINIO_BUCKET: mybucket
+      MINIO_SECURE: "False" 
+    depends_on:
+      # Garante que o MinIO esteja pronto antes de iniciar a API
+      minio:
+        condition: service_healthy
+    volumes:
+      - ./api:/app
